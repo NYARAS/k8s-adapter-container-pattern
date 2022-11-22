@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: adapter-container-example
+spec:
+  # Create a volume called 'shared-logs' that the
+  # app and adapter share.
+  volumes:
+  - name: shared-logs 
+    emptyDir: {}
+
+  containers:
+
+  # Main application container
+  - name: main-container
+    # Simple application: busybox writes system usage information (`top`) to a status 
+    # file every five seconds to top.txt file.
+    # to the volume mount workdir location
+    image: busybox
+    command: ["/bin/sh"]
+    args: ["-c", "while true; do date > /var/log/top.txt && top -n 1 -b >> /var/log/top.txt; sleep 5;done"]
+    resources: {}
+
+    # Mount the pod's shared log file into the app 
+    # container. The app writes logs here.
+    volumeMounts:
+    - name: shared-logs
+      mountPath: /var/log
+
+  # Adapter container
+  - name: adapter-container
+    # simple adapter: alpine creates logs in the same
+    # location as main application with a timestamp
+    image: alpine
+    command: ["/bin/sh"]
+    args: ["-c", "while true; do (cat /var/log/top.txt | head -1 > /var/log/status.txt) && (cat /var/log/top.txt | head -2 | tail -1 | grep -o -E '\\d+\\w' | head -1 >> /var/log/status.txt) && (cat /var/log/top.txt | head -3 | tail -1 | grep -o -E '\\d+%' | head -1 >> /var/log/status.txt); sleep 5; done"]
+    resources: {}
+
+    # Mount the pod's shared log file into the adapter
+    # container.
+    volumeMounts:
+    - name: shared-logs
+      mountPath: /var/log
